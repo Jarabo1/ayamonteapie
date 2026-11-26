@@ -10,7 +10,7 @@ registerSW({ immediate: true });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter basename="/ayamonteapie">
+    <BrowserRouter>
       <App />
     </BrowserRouter>
   </StrictMode>
