@@ -1,18 +1,19 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { routes as staticRoutes } from "../data/routes";
-import { getAllCustomRoutes, deleteCustomRoute } from "../utils/storage";
+import { getAllCustomRoutes, deleteCustomRoute, getChosenRouteId, setChosenRouteId } from "../utils/storage";
 import { START_POINT } from "../data/routes";
 import MapView from "../components/MapView";
 import { useUserLocation } from "../hooks/useUserLocation";
 import type { Route, LatLng } from "../types";
-import { haversineM } from "../utils/geo";
+import { haversineM, fetchFootRoute } from "../utils/geo";
 
 export default function RouteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { pos, request } = useUserLocation();
   const [allRoutes, setAllRoutes] = useState<Route[]>(staticRoutes);
+  const [chosenId, setChosenId] = useState<string | null>(null);
   const [approxInGeom, setApproxInGeom] = useState<LatLng[]>([]);
   const [approxInDist, setApproxInDist] = useState<number>(0);
   const [approxInStreets, setApproxInStreets] = useState<string[]>([]);
@@ -23,6 +24,7 @@ export default function RouteDetail() {
 
   useEffect(() => {
     getAllCustomRoutes().then((c) => setAllRoutes([...staticRoutes, ...c]));
+    getChosenRouteId().then(setChosenId);
   }, []);
 
   const route = allRoutes.find((r) => r.id === id);
@@ -64,6 +66,11 @@ export default function RouteDetail() {
       }
       setApproxInStreets(sts);
     }).catch(() => {});
+    fetchFootRoute([pos, first]).then((r0) => {
+      setApproxInGeom(r0.geometry);
+      setApproxInDist(r0.distanceM);
+      setApproxInStreets(r0.streets);
+    }).catch(() => {});
     fetch(urlOut).then((r) => r.json()).then((json) => {
       if (json.code !== "Ok") return;
       const r0 = json.routes[0];
@@ -75,6 +82,11 @@ export default function RouteDetail() {
         if (n && (sts.length === 0 || sts[sts.length - 1] !== n)) sts.push(n);
       }
       setApproxOutStreets(sts);
+    }).catch(() => {});
+    fetchFootRoute([last, pos]).then((r0) => {
+      setApproxOutGeom(r0.geometry);
+      setApproxOutDist(r0.distanceM);
+      setApproxOutStreets(r0.streets);
     }).catch(() => {});
   }, [pos, route]);
 
@@ -105,14 +117,24 @@ export default function RouteDetail() {
     if (!route || !route.isCustom) return;
     if (!confirm("¿Eliminar esta ruta creada?")) return;
     await deleteCustomRoute(route.id);
+    if (chosenId === route.id) {
+      await setChosenRouteId(null);
+      setChosenId(null);
+    }
     navigate("/rutas");
+  }
+
+  async function handleChoose() {
+    if (!route) return;
+    await setChosenRouteId(route.id);
+    setChosenId(route.id);
   }
 
   return (
     <div>
       <Link to="/rutas" style={{ textDecoration: "none" }}>← Volver</Link>
       <div className="card" style={{ marginTop: 8 }}>
-        <h2 style={{ marginTop: 0 }}>{route.name} {route.isCustom && <span className="badge">Creada por ti</span>}</h2>
+        <h2 style={{ marginTop: 0 }}>{route.name} {route.isCustom && <span className="badge">Creada por ti</span>} {chosenId === route.id && <span className="badge" style={{ background: "#2e7d5b", color: "#fff" }}>Elegida</span>}</h2>
         <div className="route-meta">{route.category === "urbana" ? "Urbana" : "Natural"} · {route.difficulty}</div>
         <p>{route.description}</p>
         <div className="stat-grid">
@@ -125,6 +147,9 @@ export default function RouteDetail() {
         {pos && userStreet && <div style={{ fontSize: "0.8rem", color: "#2e7d5b", marginTop: 4 }}>Tu ubicación actual: {userStreet}</div>}
         <div className="row" style={{ marginTop: 8 }}>
           <button className="btn btn-primary" onClick={request}>{pos ? "Actualizar mi ubicación" : "Activar mi ubicación (GPS)"}</button>
+          <button className={"btn " + (chosenId === route.id ? "btn-secondary" : "btn-primary")} onClick={handleChoose} disabled={chosenId === route.id}>
+            {chosenId === route.id ? "Ruta elegida ✓" : "Elegir esta ruta"}
+          </button>
         </div>
         {!pos && <p style={{ color: "#dc2626", fontSize: "0.85rem" }}>Activa la ubicación para ver las calles desde tu posición.</p>}
         {!route.distanceVerified && <div className="pending">⚠ Distancia pendiente de verificar</div>}

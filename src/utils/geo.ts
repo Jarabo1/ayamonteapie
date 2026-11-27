@@ -39,3 +39,38 @@ export function estimateCalories(durationSec: number, weightKg: number): number 
   const hours = durationSec / 3600;
   return Math.round(3.5 * weightKg * hours);
 }
+
+const FOOT_ROUTER_BASE = "https://routing.openstreetmap.de/routed-foot/route/v1/foot";
+
+export interface FootRouteResult {
+  geometry: [number, number][];
+  distanceM: number;
+  durationSec: number;
+  streets: string[];
+}
+
+/** Calcula un recorrido peatonal entre los puntos indicados usando el perfil foot de OSM. */
+export async function fetchFootRoute(waypoints: [number, number][]): Promise<FootRouteResult> {
+  const coords = waypoints.map((p) => `${p[1]},${p[0]}`).join(";");
+  const res = await fetch(`${FOOT_ROUTER_BASE}/${coords}?overview=full&geometries=geojson&steps=true`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.code !== "Ok" || !json.routes?.length) throw new Error(json.code || "No route");
+  const r = json.routes[0];
+  const geometry = r.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as [number, number]);
+  const streets: string[] = [];
+  for (const leg of r.legs ?? []) {
+    for (const step of leg.steps ?? []) {
+      const name = (step.name || "").trim();
+      if (name && (streets.length === 0 || streets[streets.length - 1] !== name)) {
+        streets.push(name);
+      }
+    }
+  }
+  return {
+    geometry,
+    distanceM: r.distance,
+    durationSec: r.duration,
+    streets,
+  };
+}

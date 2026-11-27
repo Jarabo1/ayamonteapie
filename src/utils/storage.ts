@@ -52,6 +52,18 @@ export async function setKV(key: string, value: unknown): Promise<void> {
   await d.put("kv", value, key);
 }
 
+export async function getChosenRouteId(): Promise<string | null> {
+  const d = await db();
+  const v = await d.get("kv", "chosenRouteId");
+  return (v ?? null) as string | null;
+}
+
+export async function setChosenRouteId(id: string | null): Promise<void> {
+  const d = await db();
+  if (id) await d.put("kv", id, "chosenRouteId");
+  else await d.delete("kv", "chosenRouteId");
+}
+
 export async function saveCustomRoute(route: Route): Promise<void> {
   const d = await db();
   await d.put("routes", route);

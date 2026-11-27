@@ -32,6 +32,7 @@ const routes = [
 async function fetchRoute(wps) {
   const coords = wps.map(p => `${p[1]},${p[0]}`).join(";");
   const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson&steps=true`;
+  const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords}?overview=full&geometries=geojson&steps=true`;
   const res = await fetch(url);
   const json = await res.json();
   if (json.code !== "Ok") throw new Error(json.code);

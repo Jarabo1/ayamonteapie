@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import MapView from "../components/MapView";
 import { START_POINT } from "../data/routes";
 import { haversineM, formatDistance, formatDuration, formatSpeed, estimateCalories } from "../utils/geo";
-import { saveWalk } from "../utils/storage";
-import type { TrackPoint, LatLng } from "../types";
+import { saveWalk, getAllCustomRoutes, getChosenRouteId } from "../utils/storage";
+import { routes as staticRoutes } from "../data/routes";
+import type { TrackPoint, LatLng, Route } from "../types";
 
 const MAX_ACCURACY = 30; // meters
 const MAX_JUMP_SPEED_KMH = 15;
@@ -17,14 +18,79 @@ export default function Walk() {
   const [error, setError] = useState<string>("");
   const [tick, setTick] = useState(0);
   const [summary, setSummary] = useState<{ distanceM: number; durationSec: number; avgSpeedKmh: number; maxSpeedKmh: number; calories: number } | null>(null);
+  const [chosenRoute, setChosenRoute] = useState<Route | null>(null);
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
+
+  useEffect(() => { chosenRouteRef.current = chosenRoute; }, [chosenRoute]);
+
+  // Mantener la pantalla activa mientras se camina (Wake Lock) y re-adquirir al volver a primer plano.
+  useEffect(() => {
+    async function reacquire() {
+      if (status !== "running") return;
+      if (document.visibilityState !== "visible") return;
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLockRef.current?.release?.();
+          wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        }
+      } catch {}
+    }
+    const onVis = () => { if (document.visibilityState === "visible") reacquire(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [status]);
+
+  function speak(text: string) {
+    if (!voiceEnabled) return;
+    if (!("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "es-ES";
+      u.rate = 1;
+      window.speechSynthesis.speak(u);
+    } catch {}
+  }
+
+  function guide(pos: LatLng) {
+    const r = chosenRouteRef.current;
+    if (!r || !r.geometry || r.geometry.length < 2 || !r.indications || !r.indications.length) return;
+    const geom = r.geometry;
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < geom.length; i++) {
+      const d = haversineM(pos, geom[i]);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    const progress = best / (geom.length - 1);
+    const idx = Math.min(r.indications.length - 1, Math.floor(progress * r.indications.length));
+    if (idx > lastSpokenIdxRef.current) {
+      lastSpokenIdxRef.current = idx;
+      speak(r.indications[idx]);
+    }
+  }
 
   const startedAtRef = useRef<number>(0);
+
+  useEffect(() => {
+    (async () => {
+      const id = await getChosenRouteId();
+      if (!id) return;
+      const custom = await getAllCustomRoutes();
+      const all = [...staticRoutes, ...custom];
+      const r = all.find((x) => x.id === id) || null;
+      setChosenRoute(r);
+      chosenRouteRef.current = r;
+    })();
+  }, []);
   const pausedAtRef = useRef<number>(0);
   const pausedMsRef = useRef<number>(0);
   const pointsRef = useRef<TrackPoint[]>([]);
   const watchIdRef = useRef<number | null>(null);
   const wakeLockRef = useRef<any>(null);
   const maxSpeedRef = useRef<number>(0);
+  const lastSpokenIdxRef = useRef<number>(-1);
+  const chosenRouteRef = useRef<Route | null>(null);
 
   useEffect(() => {
     let iv: any = null;
@@ -73,6 +139,15 @@ export default function Walk() {
     pausedMsRef.current = 0;
     setStatus("running");
     requestWakeLock();
+    lastSpokenIdxRef.current = -1;
+    const r = chosenRouteRef.current;
+    if (r) {
+      const first = r.indications && r.indications.length ? r.indications[0] : "el punto de salida";
+      speak(`Iniciando caminata por la ruta ${r.name}. Dirígete hacia ${first}.`);
+      lastSpokenIdxRef.current = 0;
+    } else {
+      speak("Caminata libre iniciada.");
+    }
 
     const id = navigator.geolocation.watchPosition(
       (p) => {
@@ -84,6 +159,7 @@ export default function Walk() {
           speed: p.coords.speed ?? undefined,
         };
         setPos([pt.lat, pt.lng]);
+        guide([pt.lat, pt.lng]);
         // filter accuracy
         if (pt.accuracy > MAX_ACCURACY) return;
         const prev = pointsRef.current[pointsRef.current.length - 1];
@@ -135,6 +211,7 @@ export default function Walk() {
           timestamp: p.timestamp || Date.now(), speed: p.coords.speed ?? undefined,
         };
         setPos([pt.lat, pt.lng]);
+        guide([pt.lat, pt.lng]);
         if (pt.accuracy > MAX_ACCURACY) return;
         const prev = pointsRef.current[pointsRef.current.length - 1];
         if (prev) {
@@ -165,6 +242,7 @@ export default function Walk() {
       watchIdRef.current = null;
     }
     releaseWakeLock();
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     const endedAt = Date.now();
     const dur = Math.max(0, (endedAt - startedAtRef.current - pausedMsRef.current) / 1000);
     const dist = distanceM;
@@ -204,6 +282,14 @@ export default function Walk() {
     <div>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Caminata GPS</h2>
+        {chosenRoute && (
+          <p style={{ fontSize: "0.85rem", color: "#2e7d5b", margin: "4px 0" }}>
+            Ruta elegida: <strong>{chosenRoute.name}</strong> — guía por voz activa.
+          </p>
+        )}
+        <label style={{ fontSize: "0.85rem" }}>
+          <input type="checkbox" checked={voiceEnabled} onChange={(e) => setVoiceEnabled(e.target.checked)} /> Guía por voz
+        </label>
         {error && <p style={{ color: "#dc2626", fontSize: "0.85rem" }}>GPS: {error}</p>}
         <p style={{ fontSize: "0.8rem", color: "#6b7280" }}>
           El seguimiento puede interrumpirse si Android suspende el navegador. Mantén la pantalla activa.

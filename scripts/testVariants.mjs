@@ -6,7 +6,7 @@ const variants = {
 };
 async function dist(wps) {
   const coords = wps.map(p => `${p[1]},${p[0]}`).join(";");
-  const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=false`;
+  const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords}?overview=false`;
   const res = await fetch(url);
   const json = await res.json();
   return json.routes[0].distance;

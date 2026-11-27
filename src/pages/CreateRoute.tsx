@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import MapView from "../components/MapView";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { saveCustomRoute } from "../utils/storage";
-import { haversineM } from "../utils/geo";
+import { haversineM, fetchFootRoute } from "../utils/geo";
 import type { Route, LatLng, Difficulty } from "../types";
 
 function offsetKm(origin: LatLng, km: number, angleRad: number): LatLng {
@@ -21,7 +21,7 @@ export default function CreateRoute() {
   const { pos } = useUserLocation();
   const center = pos || [37.2169243, -7.3973623] as LatLng;
 
-  const [mode, setMode] = useState<"manual" | "auto">("manual");
+  const [mode, setMode] = useState<"manual" | "auto" | "random">("manual");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("Fácil");
@@ -57,11 +57,18 @@ export default function CreateRoute() {
     setStreets([]);
   }
 
-  async function generateAuto() {
-    const origin = pos || center;
-    const speedKmh = difficulty === "Fácil" ? 4.5 : difficulty === "Moderada" ? 5.5 : 6.5;
-    const km = useTime ? (targetKm > 0 ? targetKm : (duration / 60) * speedKmh) : targetKm;
-    const target = Math.max(2, Math.min(9.5, km));
+  const NEIGHBORHOODS: { name: string; coord: LatLng }[] = [
+    { name: "Centro", coord: [37.2169243, -7.3973623] },
+    { name: "Barrio Alto", coord: [37.222, -7.4] },
+    { name: "La Villa", coord: [37.218, -7.406] },
+    { name: "Isla Canela", coord: [37.186, -7.34] },
+    { name: "Punta del Moral", coord: [37.195, -7.33] },
+    { name: "Salinas del Duque", coord: [37.2, -7.355] },
+    { name: "Vera", coord: [37.2, -7.38] },
+    { name: "Vía Verde", coord: [37.218881, -7.376229] },
+  ];
+
+  async function generateCore(origin: LatLng, difficulty: Difficulty, target: number, label: string) {
     setGenerating(true);
     setError("");
     let best: { points: LatLng[]; geometry: LatLng[]; distance: number; streets: string[] } | null = null;
@@ -76,20 +83,10 @@ export default function CreateRoute() {
       }
       wps.push(origin);
       try {
-        const coords = wps.map((p) => `${p[1]},${p[0]}`).join(";");
-        const res = await fetch(`https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`);
-        const json = await res.json();
-        if (json.code !== "Ok") continue;
-        const r = json.routes[0];
-        const geom = r.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as LatLng);
-        const dist = r.distance / 1000;
-        const sts: string[] = [];
-        for (const leg of r.legs) for (const step of leg.steps) {
-          const n = (step.name || "").trim();
-          if (n && (sts.length === 0 || sts[sts.length - 1] !== n)) sts.push(n);
-        }
+        const r = await fetchFootRoute(wps);
+        const dist = r.distanceM / 1000;
         if (!best || Math.abs(dist - target) < Math.abs(best.distance - target)) {
-          best = { points: wps, geometry: geom, distance: dist, streets: sts };
+          best = { points: wps, geometry: r.geometry, distance: dist, streets: r.streets };
         }
         if (Math.abs(dist - target) < target * 0.15) break;
       } catch {
@@ -99,7 +96,6 @@ export default function CreateRoute() {
     }
     setGenerating(false);
     if (!best) {
-      // fallback: straight line polygon
       const radius = target / (2 * Math.PI);
       const wps: LatLng[] = [origin];
       for (let i = 0; i < 5; i++) {
@@ -115,8 +111,28 @@ export default function CreateRoute() {
     setGeometry(best.geometry);
     setDistanceKm(best.distance);
     setStreets(best.streets);
-    setName(`Ruta generada ${best.distance.toFixed(1)} km`);
-    setDescription(`Ruta generada automáticamente (${difficulty}).`);
+    setName(`Ruta ${label} ${best.distance.toFixed(1)} km`);
+    setDescription(`Ruta generada ${label.toLowerCase()} (${difficulty}).`);
+  }
+
+  async function generateAuto() {
+    const origin = pos || center;
+    const speedKmh = difficulty === "Fácil" ? 4.5 : difficulty === "Moderada" ? 5.5 : 6.5;
+    const km = useTime ? (targetKm > 0 ? targetKm : (duration / 60) * speedKmh) : targetKm;
+    const target = Math.max(2, Math.min(9.5, km));
+    await generateCore(origin, difficulty, target, "automática");
+  }
+
+  async function generateRandom() {
+    const nb = NEIGHBORHOODS[Math.floor(Math.random() * NEIGHBORHOODS.length)];
+    const origin = nb.coord;
+    const difficulties: Difficulty[] = ["Fácil", "Moderada", "Difícil"];
+    const diff = difficulties[Math.floor(Math.random() * difficulties.length)];
+    const target = Math.max(2, Math.min(9.5, 2 + Math.random() * 7));
+    setDifficulty(diff);
+    setTargetKm(Number(target.toFixed(1)));
+    setUseTime(false);
+    await generateCore(origin, diff, target, `aleatoria · ${nb.name}`);
   }
 
   async function calculate() {
@@ -126,20 +142,10 @@ export default function CreateRoute() {
     try {
       const wps = points[0][0] === points[points.length-1][0] && points[0][1] === points[points.length-1][1]
         ? points : [...points, points[0]];
-      const coords = wps.map((p) => `${p[1]},${p[0]}`).join(";");
-      const res = await fetch(`https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`);
-      const json = await res.json();
-      if (json.code !== "Ok") throw new Error(json.code);
-      const r = json.routes[0];
-      const geom = r.geometry.coordinates.map((c: number[]) => [c[1], c[0]] as LatLng);
-      setGeometry(geom);
-      setDistanceKm(r.distance / 1000);
-      const sts: string[] = [];
-      for (const leg of r.legs) for (const step of leg.steps) {
-        const n = (step.name || "").trim();
-        if (n && (sts.length === 0 || sts[sts.length - 1] !== n)) sts.push(n);
-      }
-      setStreets(sts);
+      const r = await fetchFootRoute(wps);
+      setGeometry(r.geometry);
+      setDistanceKm(r.distanceM / 1000);
+      setStreets(r.streets);
     } catch {
       // fallback haversine
       const wps = points[0][0] === points[points.length-1][0] && points[0][1] === points[points.length-1][1]
@@ -194,8 +200,19 @@ export default function CreateRoute() {
         <div className="row" style={{ marginBottom: 8 }}>
           <button className={"btn " + (mode === "manual" ? "btn-primary" : "btn-secondary")} onClick={() => setMode("manual")}>Manual</button>
           <button className={"btn " + (mode === "auto" ? "btn-primary" : "btn-secondary")} onClick={() => setMode("auto")}>Automática</button>
+          <button className={"btn " + (mode === "random" ? "btn-primary" : "btn-secondary")} onClick={() => setMode("random")}>Aleatoria</button>
         </div>
         {mode === "manual" && <p style={{ fontSize: "0.8rem", color: "#6b7280" }}>Toca el mapa para añadir puntos. Calcula la ruta real y guárdala.</p>}
+        {mode === "random" && (
+          <div>
+            <p style={{ fontSize: "0.8rem", color: "#6b7280" }}>Genera una ruta aleatoria sin elegir puntos, teniendo en cuenta barrios y alrededores de Ayamonte (Centro, Barrio Alto, La Villa, Isla Canela, Punta del Moral, Salinas del Duque, Vera, Vía Verde). La distancia y dificultad también son aleatorias.</p>
+            <div className="row" style={{ marginTop: 8 }}>
+              <button className="btn btn-primary" onClick={generateRandom} disabled={generating}>
+                {generating ? "Generando..." : "Generar ruta aleatoria"}
+              </button>
+            </div>
+          </div>
+        )}
         {mode === "auto" && (
           <div>
             <p style={{ fontSize: "0.8rem", color: "#6b7280" }}>Indica la distancia o el tiempo y la dificultad. La app genera la ruta por calles reales desde tu ubicación.</p>

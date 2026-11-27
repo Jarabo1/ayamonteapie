@@ -1,16 +1,37 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import InstallPrompt from "../components/InstallPrompt";
-import { getAllWalks } from "../utils/storage";
+import MapView from "../components/MapView";
+import { getAllWalks, getAllCustomRoutes, getChosenRouteId, setChosenRouteId } from "../utils/storage";
+import { routes as staticRoutes } from "../data/routes";
 import { formatDistance, formatDuration } from "../utils/geo";
-import type { Walk } from "../types";
+import type { Walk, Route, LatLng } from "../types";
 
 export default function Home() {
   const [walks, setWalks] = useState<Walk[]>([]);
-  useEffect(() => { getAllWalks().then(setWalks); }, []);
+  const [allRoutes, setAllRoutes] = useState<Route[]>(staticRoutes);
+  const [chosenId, setChosenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAllWalks().then(setWalks);
+    getAllCustomRoutes().then((c) => setAllRoutes([...staticRoutes, ...c]));
+    getChosenRouteId().then(setChosenId);
+  }, []);
+
+  const chosenRoute = allRoutes.find((r) => r.id === chosenId) || null;
+
+  async function choose(id: string) {
+    const val = id || null;
+    await setChosenRouteId(val);
+    setChosenId(val);
+  }
 
   const totalKm = walks.reduce((s, w) => s + w.distanceM, 0) / 1000;
   const totalSec = walks.reduce((s, w) => s + w.durationSec, 0);
+
+  const center: LatLng = chosenRoute
+    ? (chosenRoute.geometry && chosenRoute.geometry.length ? chosenRoute.geometry[0] : chosenRoute.startPoint)
+    : [37.2169243, -7.3973623];
 
   return (
     <div>
@@ -20,6 +41,36 @@ export default function Home() {
         <p style={{ color: "#6b7280" }}>Descubre y recorre Ayamonte caminando.</p>
         <Link to="/caminar"><button className="btn btn-primary track-btn">🚶 INICIAR CAMINATA</button></Link>
       </div>
+
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Ruta elegida</h3>
+        <label>Ruta a mostrar en inicio</label>
+        <select value={chosenId ?? ""} onChange={(e) => choose(e.target.value)}>
+          <option value="">— Ninguna —</option>
+          {allRoutes.map((r) => (
+            <option key={r.id} value={r.id}>{r.name}{r.isCustom ? " (creada)" : ""}</option>
+          ))}
+        </select>
+        {chosenRoute ? (
+          <div style={{ marginTop: 10 }}>
+            <h4 style={{ margin: "4px 0" }}>{chosenRoute.name} {chosenRoute.isCustom && <span className="badge">Creada por ti</span>}</h4>
+            <div className="route-meta">
+              {chosenRoute.category === "urbana" ? "Urbana" : "Natural"} · {chosenRoute.difficulty} · {chosenRoute.distanceVerified ? `${chosenRoute.distanceKm?.toFixed(2)} km` : "Distancia pendiente de verificar"} · {chosenRoute.estimatedDurationMin} min
+            </div>
+            <p style={{ fontSize: "0.85rem", margin: "6px 0", color: "#374151" }}>{chosenRoute.description}</p>
+            <div style={{ marginTop: 8 }}>
+              <MapView center={center} routeGeometry={chosenRoute.geometry} startPoint={chosenRoute.startPoint} waypoints={chosenRoute.isCustom ? chosenRoute.waypoints : undefined} height="30vh" fitBounds />
+            </div>
+            <div className="row" style={{ marginTop: 8 }}>
+              <Link to={`/rutas/${chosenRoute.id}`}><button className="btn btn-secondary">Ver detalle</button></Link>
+              <Link to="/caminar"><button className="btn btn-primary">Iniciar caminata</button></Link>
+            </div>
+          </div>
+        ) : (
+          <p style={{ color: "#6b7280", fontSize: "0.85rem", marginTop: 8 }}>No hay ruta elegida. Selecciona una en el desplegable o en la pantalla de Rutas.</p>
+        )}
+      </div>
+
       <div className="stat-grid">
         <div className="stat"><div className="val">{walks.length}</div><div className="lbl">Caminatas</div></div>
         <div className="stat"><div className="val">{totalKm.toFixed(1)}</div><div className="lbl">km totales</div></div>

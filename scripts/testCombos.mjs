@@ -12,7 +12,7 @@ const combos = {
   c: [START,parque,ayunt,angustias,laVilla,mirador,noria,START],
   d: [START,parque,ayunt,ribera,angustias,laVilla,mirador,START],
 };
-async function dist(wps){const coords=wps.map(p=>p[1]+','+p[0]).join(';');const r=await fetch('https://router.project-osrm.org/route/v1/foot/'+coords+'?overview=false');const j=await r.json();return j.routes[0].distance;}
+async function dist(wps){const coords=wps.map(p=>p[1]+','+p[0]).join(';');const r=await fetch('https://routing.openstreetmap.de/routed-foot/route/v1/foot/'+coords+'?overview=false');const j=await r.json();return j.routes[0].distance;}
 for (const [k,wps] of Object.entries(combos)){
   const d=await dist(wps); console.log(k,(d/1000).toFixed(2),'km'); await new Promise(r=>setTimeout(r,1200));
 }
