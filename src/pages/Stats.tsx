@@ -16,6 +16,9 @@ export default function Stats() {
   const avgSpeed = walks.length ? walks.reduce((s, w) => s + w.avgSpeedKmh, 0) / walks.length : 0;
   const bestDist = walks.length ? Math.max(...walks.map((w) => w.distanceM)) / 1000 : 0;
   const bestDur = walks.length ? Math.max(...walks.map((w) => w.durationSec)) : 0;
+  const _now = new Date();
+  const _start = new Date(_now); _start.setDate(_now.getDate() - _now.getDay()); _start.setHours(0,0,0,0);
+  const weeklyKm = walks.filter((w) => w.startedAt >= _start.getTime()).reduce((s,w)=>s+w.distanceM,0)/1000;
 
   // weekly (last 7 days)
   const now = new Date();
@@ -54,6 +57,7 @@ export default function Stats() {
           {totalKm >= 25 && <li>Más de 25 km acumulados</li>}
           {walks.length >= 10 && <li>10 caminatas realizadas</li>}
           {bestDist >= 10 && <li>Récord de 10 km en una caminata</li>}
+          {weeklyKm >= goalKm && goalKm > 0 && <li>Objetivo semanal cumplido 🎯</li>}
           {walks.length === 0 && <li>Aún sin logros: ¡sal a caminar!</li>}
         </ul>
       </div>
