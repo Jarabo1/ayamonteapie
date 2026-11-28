@@ -64,6 +64,20 @@ export async function setChosenRouteId(id: string | null): Promise<void> {
   else await d.delete("kv", "chosenRouteId");
 }
 
+export async function getFavorites(): Promise<string[]> {
+  const d = await db();
+  const v = await d.get("kv", "favorites");
+  return (v ?? []) as string[];
+}
+
+export async function toggleFavorite(id: string): Promise<string[]> {
+  const d = await db();
+  const cur = ((await d.get("kv", "favorites")) ?? []) as string[];
+  const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+  await d.put("kv", next, "favorites");
+  return next;
+}
+
 export async function saveCustomRoute(route: Route): Promise<void> {
   const d = await db();
   await d.put("routes", route);

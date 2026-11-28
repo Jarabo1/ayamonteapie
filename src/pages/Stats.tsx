@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { getAllWalks } from "../utils/storage";
+import { getAllWalks, getKV, setKV } from "../utils/storage";
 import { formatDuration, formatSpeed } from "../utils/geo";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import type { Walk } from "../types";
 
 export default function Stats() {
   const [walks, setWalks] = useState<Walk[]>([]);
-  useEffect(() => { getAllWalks().then(setWalks); }, []);
+  const [weight, setWeight] = useState<number>(70);
+  useEffect(() => { getAllWalks().then(setWalks); getKV<number>("weightKg").then((w) => { if (w) setWeight(w); }); }, []);
 
   const totalKm = walks.reduce((s, w) => s + w.distanceM, 0) / 1000;
   const totalSec = walks.reduce((s, w) => s + w.durationSec, 0);
@@ -44,6 +45,11 @@ export default function Stats() {
   return (
     <div>
       <div className="card"><h2 style={{ marginTop: 0 }}>Estadísticas personales</h2></div>
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Ajustes</h3>
+        <label>Peso (kg) para calorías</label>
+        <input type="number" value={weight} onChange={async (e) => { const v = Number(e.target.value); setWeight(v); await setKV("weightKg", v); }} />
+      </div>
       <div className="stat-grid">
         <div className="stat"><div className="val">{totalKm.toFixed(1)}</div><div className="lbl">km totales</div></div>
         <div className="stat"><div className="val">{walks.length}</div><div className="lbl">caminatas</div></div>

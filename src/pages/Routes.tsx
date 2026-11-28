@@ -1,21 +1,30 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { routes as staticRoutes } from "../data/routes";
-import { getAllCustomRoutes, getChosenRouteId, setChosenRouteId } from "../utils/storage";
+import { getAllCustomRoutes, getChosenRouteId, setChosenRouteId, getFavorites, toggleFavorite } from "../utils/storage";
 import type { Route } from "../types";
 
 export default function RoutesPage() {
   const [filter, setFilter] = useState<"all" | "urbana" | "natural">("all");
+  const [diffFilter, setDiffFilter] = useState<"all" | "Fácil" | "Moderada" | "Difícil">("all");
+  const [search, setSearch] = useState("");
   const [custom, setCustom] = useState<Route[]>([]);
   const [chosenId, setChosenId] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   useEffect(() => {
     getAllCustomRoutes().then(setCustom);
     getChosenRouteId().then(setChosenId);
+    getFavorites().then(setFavorites);
   }, []);
 
   const allRoutes = [...staticRoutes, ...custom];
-  const filtered = allRoutes.filter((r) => filter === "all" || r.category === filter);
+  const filtered = allRoutes.filter((r) => {
+    if (filter !== "all" && r.category !== filter) return false;
+    if (diffFilter !== "all" && r.difficulty !== diffFilter) return false;
+    if (search && !r.name.toLowerCase().includes(search.toLowerCase()) && !r.description.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
   async function choose(id: string) {
     await setChosenRouteId(id);
@@ -26,10 +35,17 @@ export default function RoutesPage() {
     <div>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Catálogo de rutas</h2>
+        <input placeholder="Buscar ruta..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 8 }} />
         <div className="row">
           <button className="btn btn-secondary" onClick={() => setFilter("all")}>Todas</button>
           <button className="btn btn-secondary" onClick={() => setFilter("urbana")}>Urbanas</button>
           <button className="btn btn-secondary" onClick={() => setFilter("natural")}>Naturales</button>
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <button className="btn btn-secondary" onClick={() => setDiffFilter("all")}>Cualquier dificultad</button>
+          <button className="btn btn-secondary" onClick={() => setDiffFilter("Fácil")}>Fácil</button>
+          <button className="btn btn-secondary" onClick={() => setDiffFilter("Moderada")}>Moderada</button>
+          <button className="btn btn-secondary" onClick={() => setDiffFilter("Difícil")}>Difícil</button>
         </div>
         <div style={{ marginTop: 8 }}>
           <Link to="/crear"><button className="btn btn-primary">+ Crear nueva ruta</button></Link>
@@ -46,13 +62,21 @@ export default function RoutesPage() {
             {!r.distanceVerified && <div className="pending">⚠ Distancia pendiente de verificar</div>}
             {!r.elevationVerified && <div className="pending">⚠ Desnivel pendiente de verificar</div>}
           </Link>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
             <button
               className={"btn " + (chosenId === r.id ? "btn-secondary" : "btn-primary")}
               onClick={() => choose(r.id)}
               disabled={chosenId === r.id}
+              style={{ flex: 1 }}
             >
               {chosenId === r.id ? "Ruta elegida ✓" : "Elegir esta ruta"}
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={async () => { const n = await toggleFavorite(r.id); setFavorites(n); }}
+              style={{ width: 60 }}
+            >
+              {favorites.includes(r.id) ? "★" : "☆"}
             </button>
           </div>
         </div>

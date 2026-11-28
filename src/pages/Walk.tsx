@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import MapView from "../components/MapView";
 import { START_POINT } from "../data/routes";
 import { haversineM, formatDistance, formatDuration, formatSpeed, estimateCalories } from "../utils/geo";
-import { saveWalk, getAllCustomRoutes, getChosenRouteId } from "../utils/storage";
+import { saveWalk, getAllCustomRoutes, getChosenRouteId, getKV } from "../utils/storage";
 import { routes as staticRoutes } from "../data/routes";
 import type { TrackPoint, LatLng, Route } from "../types";
 
@@ -19,7 +19,18 @@ export default function Walk() {
   const [tick, setTick] = useState(0);
   const [summary, setSummary] = useState<{ distanceM: number; durationSec: number; avgSpeedKmh: number; maxSpeedKmh: number; calories: number } | null>(null);
   const [chosenRoute, setChosenRoute] = useState<Route | null>(null);
+  const [weightKg, setWeightKg] = useState<number>(70);
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
+
+  async function sos() {
+    const p = pos || (pointsRef.current.length ? [pointsRef.current[pointsRef.current.length - 1].lat, pointsRef.current[pointsRef.current.length - 1].lng] as LatLng : null);
+    const url = p ? `https://maps.google.com/?q=${p[0]},${p[1]}` : "";
+    const text = p ? `Necesito ayuda. Mi ubicación: ${url}` : "Necesito ayuda.";
+    if (navigator.share) {
+      try { await navigator.share({ title: "SOS Ayamonte a Pie", text }); return; } catch {}
+    }
+    if (url) window.open(url, "_blank");
+  }
 
   useEffect(() => { chosenRouteRef.current = chosenRoute; }, [chosenRoute]);
 
@@ -44,6 +55,7 @@ export default function Walk() {
     if (!voiceEnabled) return;
     if (!("speechSynthesis" in window)) return;
     try {
+      if (navigator.vibrate) navigator.vibrate(200);
       window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "es-ES";
@@ -75,12 +87,15 @@ export default function Walk() {
   useEffect(() => {
     (async () => {
       const id = await getChosenRouteId();
-      if (!id) return;
-      const custom = await getAllCustomRoutes();
-      const all = [...staticRoutes, ...custom];
-      const r = all.find((x) => x.id === id) || null;
-      setChosenRoute(r);
-      chosenRouteRef.current = r;
+      if (id) {
+        const custom = await getAllCustomRoutes();
+        const all = [...staticRoutes, ...custom];
+        const r = all.find((x) => x.id === id) || null;
+        setChosenRoute(r);
+        chosenRouteRef.current = r;
+      }
+      const w = await getKV<number>("weightKg");
+      if (w) setWeightKg(w);
     })();
   }, []);
   const pausedAtRef = useRef<number>(0);
@@ -255,7 +270,7 @@ export default function Walk() {
       distanceM: dist,
       avgSpeedKmh: dur > 0 ? (dist/1000)/(dur/3600) : 0,
       maxSpeedKmh: maxSpeedRef.current,
-      calories: estimateCalories(dur, 70),
+      calories: estimateCalories(dur, weightKg),
       points: pointsRef.current,
     };
     await saveWalk(walk);
@@ -333,8 +348,11 @@ export default function Walk() {
       </div>
       <div className="card">
         <p style={{ margin: 0, fontSize: "0.8rem", color: "#6b7280" }}>
-          Puntos registrados: {points.length} · Calorías est.: {estimateCalories(elapsedSec, 70)} (aprox.)
+          Puntos registrados: {points.length} · Calorías est.: {estimateCalories(elapsedSec, weightKg)} (aprox.)
         </p>
+        <div style={{ marginTop: 8 }}>
+          <button className="btn btn-danger" onClick={sos}>� SOS / Compartir ubicación</button>
+        </div>
       </div>
     </div>
   );

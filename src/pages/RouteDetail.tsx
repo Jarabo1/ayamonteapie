@@ -130,6 +130,17 @@ export default function RouteDetail() {
     setChosenId(route.id);
   }
 
+  async function handleShare() {
+    if (!route) return;
+    const url = window.location.href;
+    if (navigator.share) {
+      try { await navigator.share({ title: route.name, text: route.description, url }); } catch {}
+    } else {
+      await navigator.clipboard.writeText(url);
+      alert("Enlace copiado");
+    }
+  }
+
   return (
     <div>
       <Link to="/rutas" style={{ textDecoration: "none" }}>← Volver</Link>
@@ -150,6 +161,7 @@ export default function RouteDetail() {
           <button className={"btn " + (chosenId === route.id ? "btn-secondary" : "btn-primary")} onClick={handleChoose} disabled={chosenId === route.id}>
             {chosenId === route.id ? "Ruta elegida ✓" : "Elegir esta ruta"}
           </button>
+          <button className="btn btn-secondary" onClick={handleShare}>Compartir</button>
         </div>
         {!pos && <p style={{ color: "#dc2626", fontSize: "0.85rem" }}>Activa la ubicación para ver las calles desde tu posición.</p>}
         {!route.distanceVerified && <div className="pending">⚠ Distancia pendiente de verificar</div>}

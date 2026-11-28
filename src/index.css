@@ -9,11 +9,20 @@
   --danger: #dc2626;
   --guadiana: #2b6cb0;
 }
+body.dark {
+  --bg: #111827;
+  --card: #1f2937;
+  --text: #f9fafb;
+  --muted: #9ca3af;
+  --primary: #34d399;
+  --primary-dark: #10b981;
+}
+body.large-text { font-size: 1.15rem; }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; padding: 0; }
 body { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
 .app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
-.topbar { background: var(--primary); color: white; padding: 12px 16px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+.topbar { background: var(--primary); color: white; padding: 12px 16px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.15); position: relative; }
 .topbar h1 { margin: 0; font-size: 1.1rem; letter-spacing: 1px; }
 .content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px; padding-bottom: 80px; }
 .bottomnav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; justify-content: space-around; border-top: 1px solid #e5e7eb; padding: 6px 0; z-index: 1000; box-shadow: 0 -2px 6px rgba(0,0,0,.08); }
