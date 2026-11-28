@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { routes as staticRoutes } from "../data/routes";
-import { getAllCustomRoutes, getChosenRouteId, setChosenRouteId, getFavorites, toggleFavorite } from "../utils/storage";
+import { getAllCustomRoutes, getChosenRouteId, setChosenRouteId, getFavorites, toggleFavorite, deleteCustomRoute } from "../utils/storage";
 import type { Route } from "../types";
 
 export default function RoutesPage() {
@@ -31,6 +31,16 @@ export default function RoutesPage() {
   async function choose(id: string) {
     await setChosenRouteId(id);
     setChosenId(id);
+  }
+
+  async function handleDeleteRoute(id: string) {
+    if (!confirm("¿Eliminar esta ruta creada?")) return;
+    await deleteCustomRoute(id);
+    setCustom((prev) => prev.filter((r) => r.id !== id));
+    if (chosenId === id) {
+      await setChosenRouteId(null);
+      setChosenId(null);
+    }
   }
 
   return (
@@ -81,6 +91,11 @@ export default function RoutesPage() {
             >
               {favorites.includes(r.id) ? "★" : "☆"}
             </button>
+            {r.isCustom && (
+              <button className="btn btn-danger" onClick={() => handleDeleteRoute(r.id)} style={{ width: 60 }}>
+                🗑
+              </button>
+            )}
           </div>
         </div>
       ))}
