@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import InstallPrompt from "../components/InstallPrompt";
 import MapView from "../components/MapView";
-import { getAllWalks, getAllCustomRoutes, getChosenRouteId, setChosenRouteId } from "../utils/storage";
+import { getAllWalks, getAllCustomRoutes, getChosenRouteId, setChosenRouteId, getKV } from "../utils/storage";
 import { routes as staticRoutes } from "../data/routes";
 import { formatDistance, formatDuration } from "../utils/geo";
 import type { Walk, Route, LatLng } from "../types";
@@ -11,11 +11,22 @@ export default function Home() {
   const [walks, setWalks] = useState<Walk[]>([]);
   const [allRoutes, setAllRoutes] = useState<Route[]>(staticRoutes);
   const [chosenId, setChosenId] = useState<string | null>(null);
+  const [goalKm, setGoalKm] = useState<number>(10);
+  const [weeklyKm, setWeeklyKm] = useState<number>(0);
 
   useEffect(() => {
-    getAllWalks().then(setWalks);
+    getAllWalks().then((ws) => {
+      setWalks(ws);
+      const now = new Date();
+      const start = new Date(now);
+      start.setDate(now.getDate() - now.getDay());
+      start.setHours(0, 0, 0, 0);
+      const km = ws.filter((w) => w.startedAt >= start.getTime()).reduce((s, w) => s + w.distanceM, 0) / 1000;
+      setWeeklyKm(km);
+    });
     getAllCustomRoutes().then((c) => setAllRoutes([...staticRoutes, ...c]));
     getChosenRouteId().then(setChosenId);
+    getKV<number>("goalKm").then((g) => { if (g) setGoalKm(g); });
   }, []);
 
   const chosenRoute = allRoutes.find((r) => r.id === chosenId) || null;
@@ -71,6 +82,13 @@ export default function Home() {
         )}
       </div>
 
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Objetivo semanal</h3>
+        <div style={{ background: "#e5e7eb", borderRadius: 999, height: 12, overflow: "hidden" }}>
+          <div style={{ width: `${Math.min(100, (weeklyKm / (goalKm || 1)) * 100)}%`, background: "var(--primary)", height: "100%" }} />
+        </div>
+        <p style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: 6 }}>{weeklyKm.toFixed(1)} / {goalKm} km esta semana</p>
+      </div>
       <div className="stat-grid">
         <div className="stat"><div className="val">{walks.length}</div><div className="lbl">Caminatas</div></div>
         <div className="stat"><div className="val">{totalKm.toFixed(1)}</div><div className="lbl">km totales</div></div>

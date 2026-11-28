@@ -7,7 +7,8 @@ import type { Walk } from "../types";
 export default function Stats() {
   const [walks, setWalks] = useState<Walk[]>([]);
   const [weight, setWeight] = useState<number>(70);
-  useEffect(() => { getAllWalks().then(setWalks); getKV<number>("weightKg").then((w) => { if (w) setWeight(w); }); }, []);
+  const [goalKm, setGoalKm] = useState<number>(10);
+  useEffect(() => { getAllWalks().then(setWalks); getKV<number>("weightKg").then((w) => { if (w) setWeight(w); }); getKV<number>("goalKm").then((g) => { if (g) setGoalKm(g); }); }, []);
 
   const totalKm = walks.reduce((s, w) => s + w.distanceM, 0) / 1000;
   const totalSec = walks.reduce((s, w) => s + w.durationSec, 0);
@@ -60,6 +61,8 @@ export default function Stats() {
         <h3 style={{ marginTop: 0 }}>Ajustes</h3>
         <label>Peso (kg) para calorías</label>
         <input type="number" value={weight} onChange={async (e) => { const v = Number(e.target.value); setWeight(v); await setKV("weightKg", v); }} />
+        <label style={{ marginTop: 8 }}>Objetivo semanal (km)</label>
+        <input type="number" value={goalKm} onChange={async (e) => { const v = Number(e.target.value); setGoalKm(v); await setKV("goalKm", v); }} />
       </div>
       <div className="stat-grid">
         <div className="stat"><div className="val">{totalKm.toFixed(1)}</div><div className="lbl">km totales</div></div>
