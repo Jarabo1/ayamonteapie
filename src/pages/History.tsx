@@ -69,6 +69,11 @@ export default function History() {
             )}
             <div className="row" style={{ marginTop: 8 }}>
               <button className="btn btn-secondary" onClick={() => downloadGPX(w)}>GPX</button>
+              <button className="btn btn-secondary" onClick={async () => {
+                if (navigator.share) {
+                  try { await navigator.share({ title: "Caminata Ayamonte a Pie", text: `${formatDistance(w.distanceM)} en ${formatDuration(w.durationSec)}` }); } catch {}
+                } else { alert("Compartir no disponible"); }
+              }}>Compartir</button>
               <button className="btn btn-danger" onClick={async () => { if (confirm("¿Eliminar esta caminata?")) { await deleteWalk(w.id); reload(); } }}>Eliminar</button>
             </div>
           </div>

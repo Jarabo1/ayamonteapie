@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { routes as staticRoutes } from "../data/routes";
-import { getAllCustomRoutes, deleteCustomRoute, getChosenRouteId, setChosenRouteId } from "../utils/storage";
+import { getAllCustomRoutes, deleteCustomRoute, getChosenRouteId, setChosenRouteId, setKV } from "../utils/storage";
 import { START_POINT } from "../data/routes";
 import MapView from "../components/MapView";
 import { useUserLocation } from "../hooks/useUserLocation";
@@ -141,6 +141,12 @@ export default function RouteDetail() {
     }
   }
 
+  async function handleOffline() {
+    if (!route) return;
+    await setKV("offlineRoute:" + route.id, route);
+    alert("Ruta guardada para uso offline");
+  }
+
   return (
     <div>
       <Link to="/rutas" style={{ textDecoration: "none" }}>← Volver</Link>
@@ -162,6 +168,7 @@ export default function RouteDetail() {
             {chosenId === route.id ? "Ruta elegida ✓" : "Elegir esta ruta"}
           </button>
           <button className="btn btn-secondary" onClick={handleShare}>Compartir</button>
+          <button className="btn btn-secondary" onClick={handleOffline}>Guardar offline</button>
         </div>
         {!pos && <p style={{ color: "#dc2626", fontSize: "0.85rem" }}>Activa la ubicación para ver las calles desde tu posición.</p>}
         {!route.distanceVerified && <div className="pending">⚠ Distancia pendiente de verificar</div>}
