@@ -8,6 +8,7 @@ export default function RoutesPage() {
   const [filter, setFilter] = useState<"all" | "urbana" | "natural">("all");
   const [diffFilter, setDiffFilter] = useState<"all" | "Fácil" | "Moderada" | "Difícil">("all");
   const [search, setSearch] = useState("");
+  const [favOnly, setFavOnly] = useState(false);
   const [custom, setCustom] = useState<Route[]>([]);
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -23,6 +24,7 @@ export default function RoutesPage() {
     if (filter !== "all" && r.category !== filter) return false;
     if (diffFilter !== "all" && r.difficulty !== diffFilter) return false;
     if (search && !r.name.toLowerCase().includes(search.toLowerCase()) && !r.description.toLowerCase().includes(search.toLowerCase())) return false;
+    if (favOnly && !favorites.includes(r.id)) return false;
     return true;
   });
 
@@ -42,6 +44,7 @@ export default function RoutesPage() {
           <button className="btn btn-secondary" onClick={() => setFilter("natural")}>Naturales</button>
         </div>
         <div className="row" style={{ marginTop: 8 }}>
+          <button className={"btn " + (favOnly ? "btn-primary" : "btn-secondary")} onClick={() => setFavOnly(!favOnly)}>★ Favoritas</button>
           <button className="btn btn-secondary" onClick={() => setDiffFilter("all")}>Cualquier dificultad</button>
           <button className="btn btn-secondary" onClick={() => setDiffFilter("Fácil")}>Fácil</button>
           <button className="btn btn-secondary" onClick={() => setDiffFilter("Moderada")}>Moderada</button>

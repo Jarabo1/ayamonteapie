@@ -46,6 +46,17 @@ export default function Stats() {
     <div>
       <div className="card"><h2 style={{ marginTop: 0 }}>Estadísticas personales</h2></div>
       <div className="card">
+        <h3 style={{ marginTop: 0 }}>Logros</h3>
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          {walks.length >= 1 && <li>Primera caminata completada</li>}
+          {totalKm >= 5 && <li>Más de 5 km acumulados</li>}
+          {totalKm >= 25 && <li>Más de 25 km acumulados</li>}
+          {walks.length >= 10 && <li>10 caminatas realizadas</li>}
+          {bestDist >= 10 && <li>Récord de 10 km en una caminata</li>}
+          {walks.length === 0 && <li>Aún sin logros: ¡sal a caminar!</li>}
+        </ul>
+      </div>
+      <div className="card">
         <h3 style={{ marginTop: 0 }}>Ajustes</h3>
         <label>Peso (kg) para calorías</label>
         <input type="number" value={weight} onChange={async (e) => { const v = Number(e.target.value); setWeight(v); await setKV("weightKg", v); }} />
