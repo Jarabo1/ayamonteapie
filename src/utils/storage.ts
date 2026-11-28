@@ -93,3 +93,23 @@ export async function deleteCustomRoute(id: string): Promise<void> {
   const d = await db();
   await d.delete("routes", id);
 }
+
+export async function exportBackup(): Promise<string> {
+  const d = await db();
+  const walks = await d.getAll("walks");
+  const routes = await d.getAll("routes");
+  const keys = await d.getAllKeys("kv");
+  const kv: Record<string, unknown> = {};
+  for (const k of keys) kv[String(k)] = await d.get("kv", k);
+  return JSON.stringify({ walks, routes, kv }, null, 2);
+}
+
+export async function importBackup(json: string): Promise<void> {
+  const data = JSON.parse(json);
+  const d = await db();
+  if (Array.isArray(data.walks)) for (const w of data.walks) await d.put("walks", w);
+  if (Array.isArray(data.routes)) for (const r of data.routes) await d.put("routes", r);
+  if (data.kv && typeof data.kv === "object") {
+    for (const k of Object.keys(data.kv)) await d.put("kv", data.kv[k], k);
+  }
+}

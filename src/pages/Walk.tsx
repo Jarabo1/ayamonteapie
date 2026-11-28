@@ -21,6 +21,8 @@ export default function Walk() {
   const [chosenRoute, setChosenRoute] = useState<Route | null>(null);
   const [weightKg, setWeightKg] = useState<number>(70);
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(true);
+  const [autoPause, setAutoPause] = useState<boolean>(true);
+  useEffect(() => { autoPauseRef.current = autoPause; }, [autoPause]);
 
   async function sos() {
     const p = pos || (pointsRef.current.length ? [pointsRef.current[pointsRef.current.length - 1].lat, pointsRef.current[pointsRef.current.length - 1].lng] as LatLng : null);
@@ -105,12 +107,20 @@ export default function Walk() {
   const wakeLockRef = useRef<any>(null);
   const maxSpeedRef = useRef<number>(0);
   const lastSpokenIdxRef = useRef<number>(-1);
+  const lastMoveRef = useRef<number>(0);
+  const autoPauseRef = useRef<boolean>(true);
   const chosenRouteRef = useRef<Route | null>(null);
 
   useEffect(() => {
     let iv: any = null;
     if (status === "running") {
-      iv = setInterval(() => setTick((t) => t + 1), 1000);
+      lastMoveRef.current = Date.now();
+      iv = setInterval(() => {
+        setTick((t) => t + 1);
+        if (autoPauseRef.current && lastMoveRef.current && Date.now() - lastMoveRef.current > 60000) {
+          pause();
+        }
+      }, 1000);
     }
     return () => { if (iv) clearInterval(iv); };
   }, [status]);
@@ -186,6 +196,7 @@ export default function Walk() {
             if (speedKmh > MAX_JUMP_SPEED_KMH) return; // anomaly
           }
           if (dist < 2) return; // ignore tiny jitter
+          lastMoveRef.current = Date.now();
         }
         // compute instantaneous speed
         if (prev) {
@@ -234,7 +245,7 @@ export default function Walk() {
           const dist = haversineM([prev.lat, prev.lng], [pt.lat, pt.lng]);
           if (dt > 0 && (dist/1000)/(dt/3600) > MAX_JUMP_SPEED_KMH) return;
           if (dist < 2) return;
-        }
+          lastMoveRef.current = Date.now();        }
         if (prev) {
           const dt = (pt.timestamp - prev.timestamp) / 1000;
           if (dt > 0) {
@@ -304,6 +315,9 @@ export default function Walk() {
         )}
         <label style={{ fontSize: "0.85rem" }}>
           <input type="checkbox" checked={voiceEnabled} onChange={(e) => setVoiceEnabled(e.target.checked)} /> Guía por voz
+        </label>
+        <label style={{ fontSize: "0.85rem", marginLeft: 12 }}>
+          <input type="checkbox" checked={autoPause} onChange={(e) => setAutoPause(e.target.checked)} /> Auto-pausa si te detienes
         </label>
         {error && <p style={{ color: "#dc2626", fontSize: "0.85rem" }}>GPS: {error}</p>}
         <p style={{ fontSize: "0.8rem", color: "#6b7280" }}>

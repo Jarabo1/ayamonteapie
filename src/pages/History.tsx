@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getAllWalks, deleteWalk, clearWalks } from "../utils/storage";
+import { getAllWalks, deleteWalk, clearWalks, exportBackup, importBackup } from "../utils/storage";
 import { downloadCSV, downloadGPX, downloadAllGPX } from "../utils/export";
 import { formatDistance, formatDuration, formatSpeed } from "../utils/geo";
 import MapView from "../components/MapView";
@@ -19,6 +19,27 @@ export default function History() {
         <div className="row">
           <button className="btn btn-secondary" onClick={() => downloadCSV(walks)}>Exportar CSV</button>
           <button className="btn btn-secondary" onClick={() => downloadAllGPX(walks)}>Exportar GPX</button>
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <button className="btn btn-secondary" onClick={async () => {
+            const json = await exportBackup();
+            const blob = new Blob([json], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = "ayamonte-backup.json"; a.click();
+            URL.revokeObjectURL(url);
+          }}>Exportar backup JSON</button>
+          <label className="btn btn-secondary" style={{ textAlign: "center", cursor: "pointer" }}>
+            Importar backup
+            <input type="file" accept="application/json" style={{ display: "none" }} onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              const text = await f.text();
+              await importBackup(text);
+              reload();
+              alert("Backup importado");
+            }} />
+          </label>
         </div>
         <div style={{ marginTop: 8 }}>
           <button className="btn btn-danger" onClick={async () => { if (confirm("¿Eliminar todo el historial?")) { await clearWalks(); reload(); } }}>Borrar todo</button>
